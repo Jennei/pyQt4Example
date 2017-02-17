@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('Image Changer')
         #利用最近打开的文件名列表，动态更新文件菜单
         self.updateFileMenu()
-        #将长时间准备的加载文件处理，异步添加到事件循环队列里,参数0表示添加到事件队列后立即返回
+        #将长时间准备的加载文件处理即恢复上一次打开的文件，异步添加到事件循环队列里,参数0表示添加到事件队列后立即返回
         QTimer.singleShot(0, self.loadInitialFile)
 
     def closeEvent(self, event):
@@ -151,24 +151,28 @@ class MainWindow(QMainWindow):
         """
         #没每次更新菜单时候，先删除当前菜单的所有动作
         self.fileMenu.clear()
+        #把最后一个以外的动作添加到文件菜单
         self.addActions(self.fileMenu, self.fileMenuActions[:-1])
-
+        #获取当前文件名
         current = QString(self.fileName) if self.fileName is not None else None
         recentFiles = []
         for fname in self.recentFiles:
+            #在最近打开的文件里，除过自己，且确实存在该文件
             if fname != current and QFile.exists(fname):
                 recentFiles.append(fname)
         if recentFiles:
             self.fileMenu.addSeparator()
+            #以最近打开的文件创建用户动作
             for i, fname in enumerate(recentFiles):
                 action = QAction(QIcon(':/icon.png'), '&%d. %s'%(i+1, QFileInfo(fname).fileName()), self)
                 action.setData(QVariant(fname))
                 self.connect(action, SIGNAL('triggered()'), self.loadFile)
                 self.fileMenu.addAction(action)
         self.fileMenu.addSeparator()
+        #把最后一个用户动作加上
         self.fileMenu.addAction(self.fileMenuActions[-1])
 
-    def loadFile(self):
+    def loadFile(self, fname):
         """
 
         :return:
@@ -240,7 +244,7 @@ class MainWindow(QMainWindow):
             return
         pass
 
-        ###########
+        ###########测试动态菜单时候，请去掉updatefilemenu里的QFile.exists
         self.addRecentFiles('test10')
         self.dirty = True
 
@@ -262,8 +266,15 @@ class MainWindow(QMainWindow):
         文件打开
         :return:
         """
-        pass
-
+        if not self.okToContinue():
+            return
+        import os
+        dir = os.path.dirname(self.fileName) if self.fileName is not None else '.'
+        formats = ['*.%s'%unicode(fmt).lower() for fmt in QImageReader.supportedImageFormats() ]
+        fname  =unicode(QFileDialog.getOpenFileName(self, 'choose image', dir, 'image files(%s)'%'\n'.join(formats)))
+        print 'got filename', fname
+        if fname:
+            self.loadFile(fname)
     def fileSave(self):
         """
         文件保存
